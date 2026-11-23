@@ -189,6 +189,23 @@ upstream, which it clones at the pinned commit on first run:
 
 Upstream is not vendored here — the harness fetches it, because it's their code.
 
+## macOS screensaver
+
+`bin/build-saver` builds `target/saver/ttfx.saver`, a native screensaver that
+runs the effects on the text in `macos/saver/Resources/text.txt`. It needs
+Rust and the Xcode command line tools.
+
+```sh
+bin/build-saver --install    # build, then copy to ~/Library/Screen Savers
+bin/build-saver --preview    # build, then run the view in a window
+```
+
+Select **ttfx** in System Settings → Screen Saver. Its options set the
+effects in the random selection, the font, the font size, the speed and the time
+between effects. To show a different text, change `text.txt` and build again.
+
+The bundle has an ad-hoc signature, thus it is for the Mac that built it.
+
 ## Scope
 
 Linux and macOS. Built for [Omarchy](https://omarchy.org) originally; nothing targets a

@@ -1,0 +1,25 @@
+[package]
+name = "ttfx-saver-core"
+version = "0.1.0"
+edition = "2021"
+description = "C interface to the ttfx engine for the macOS screensaver"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+ttfx = { path = "../.." }
+clap = "4"
+unicode-width = "0.2"
+
+# The root profile uses panic = "abort". An abort stops the screensaver host,
+# thus this crate unwinds and catches the panic at the C interface.
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "unwind"
+
+# This crate is not a member of a workspace.
+[workspace]

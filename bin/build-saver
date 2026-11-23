@@ -1,0 +1,122 @@
+#!/usr/bin/env sh
+# Builds the macOS screensaver: target/saver/ttfx.saver
+#
+#   bin/build-saver                 build and sign the bundle
+#   bin/build-saver --universal     build for arm64 and x86_64 (needs the Rust
+#                                   standard library for the two targets)
+#   bin/build-saver --install       also copy it to ~/Library/Screen Savers
+#   bin/build-saver --preview ...   also build the development app and run it
+#                                   with the arguments that follow
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+CORE="$ROOT/macos/core"
+SAVER="$ROOT/macos/saver"
+OUT="$ROOT/target/saver"
+CORE_TARGET="$ROOT/target/saver-core"
+BUNDLE="$OUT/ttfx.saver"
+DEPLOYMENT_TARGET=13.0
+
+if [ "$(uname -s)" != "Darwin" ]; then
+  echo "The screensaver builds only on macOS." >&2
+  exit 1
+fi
+for tool in cargo swiftc codesign; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "$tool is required to build the screensaver." >&2
+    exit 1
+  fi
+done
+
+universal=0
+install=0
+preview=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --universal) universal=1 ;;
+    --install) install=1 ;;
+    --preview)
+      preview=1
+      shift
+      break
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+export MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET"
+VERSION="$(awk -F'"' '/^version *=/ { print $2; exit }' "$ROOT/Cargo.toml")"
+HOST_ARCH="$(uname -m)"
+
+# Rust name of a Mach-O architecture.
+rust_arch() {
+  case "$1" in
+    arm64) echo aarch64 ;;
+    *) echo "$1" ;;
+  esac
+}
+
+# compile ARCH OUTPUT SWIFTC_ARGS...: builds the Rust core for ARCH and links
+# it with the Swift sources.
+compile() {
+  arch="$1"
+  output="$2"
+  shift 2
+  if [ "$universal" -eq 1 ]; then
+    triple="$(rust_arch "$arch")-apple-darwin"
+    cargo build --release --manifest-path "$CORE/Cargo.toml" \
+      --target-dir "$CORE_TARGET" --target "$triple"
+    lib="$CORE_TARGET/$triple/release/libttfx_saver_core.a"
+  else
+    cargo build --release --manifest-path "$CORE/Cargo.toml" --target-dir "$CORE_TARGET"
+    lib="$CORE_TARGET/release/libttfx_saver_core.a"
+  fi
+  swiftc -O -target "$arch-apple-macos$DEPLOYMENT_TARGET" \
+    -module-name TtfxSaver \
+    -import-objc-header "$CORE/include/ttfx_saver.h" \
+    "$@" "$SAVER"/*.swift "$lib" \
+    -framework ScreenSaver -framework AppKit \
+    -o "$output"
+}
+
+# build OUTPUT SWIFTC_ARGS...: one architecture, or the two with lipo.
+build() {
+  output="$1"
+  shift
+  if [ "$universal" -eq 1 ]; then
+    compile arm64 "$output.arm64" "$@"
+    compile x86_64 "$output.x86_64" "$@"
+    lipo -create "$output.arm64" "$output.x86_64" -output "$output"
+    rm "$output.arm64" "$output.x86_64"
+  else
+    compile "$HOST_ARCH" "$output" "$@"
+  fi
+}
+
+rm -rf "$BUNDLE"
+mkdir -p "$BUNDLE/Contents/MacOS" "$BUNDLE/Contents/Resources"
+build "$BUNDLE/Contents/MacOS/ttfx" -parse-as-library -emit-library -Xlinker -bundle
+sed -e "s/@VERSION@/$VERSION/g" -e "s/@DEPLOYMENT_TARGET@/$DEPLOYMENT_TARGET/g" \
+  "$SAVER/Info.plist.in" >"$BUNDLE/Contents/Info.plist"
+cp "$SAVER"/Resources/* "$BUNDLE/Contents/Resources/"
+codesign --force --sign - "$BUNDLE"
+echo "Built $BUNDLE"
+
+if [ "$install" -eq 1 ]; then
+  destination="$HOME/Library/Screen Savers"
+  mkdir -p "$destination"
+  rm -rf "$destination/ttfx.saver"
+  cp -R "$BUNDLE" "$destination/"
+  echo "Installed $destination/ttfx.saver"
+fi
+
+if [ "$preview" -eq 1 ]; then
+  mkdir -p "$OUT/preview"
+  build "$OUT/preview/ttfx-saver-preview" "$ROOT/macos/preview/main.swift"
+  cp "$SAVER/Resources/text.txt" "$OUT/preview/"
+  exec "$OUT/preview/ttfx-saver-preview" "$@"
+fi

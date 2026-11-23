@@ -36,6 +36,14 @@ jobs:
         with:
           name: ttfx-aarch64-apple-darwin
           path: target/release/ttfx
+      # The screensaver: the tests of its Rust core, then the bundle.
+      - run: cargo test --release --manifest-path macos/core/Cargo.toml
+      - run: ./bin/build-saver
+      - run: cd target/saver && zip -r ttfx.saver.zip ttfx.saver
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ttfx-saver-aarch64-apple-darwin
+          path: target/saver/ttfx.saver.zip
 
   release-binary:
     name: Static musl binary
