@@ -35,7 +35,8 @@ final class TtfxSaverView: ScreenSaverView {
     var fixedStep = false
     private var lastStepTime: CFTimeInterval?
     private var stepDebt = 0.0
-    private let text = TtfxSaverView.loadText()
+    private var config = ConfigFile()
+    private var text = Data()
     private var optionsSheet: OptionsSheet?
     private var stopObserver: NSObjectProtocol?
 
@@ -62,14 +63,18 @@ final class TtfxSaverView: ScreenSaverView {
     /// Reads the settings again and starts a new effect.
     func applySettings() {
         settings = Settings.load()
+        config = ConfigFile.load()
+        text = Self.loadText(from: config.textFile)
         animationTimeInterval = 1 / min(Double(settings.frameRate), Self.maxDrawRate)
         renderer = nil
         nextEffect()
     }
 
-    private static func loadText() -> Data {
+    /// The text of `file`. If there is no file or it cannot be read, the
+    /// text that is in the bundle.
+    private static func loadText(from file: URL?) -> Data {
         let bundle = Bundle(for: TtfxSaverView.self)
-        var candidates = [bundle.url(forResource: "text", withExtension: "txt")]
+        var candidates = [file, bundle.url(forResource: "text", withExtension: "txt")]
         // The development app is not a bundle: the text is adjacent to it.
         candidates.append(
             Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent("text.txt"))
@@ -82,7 +87,7 @@ final class TtfxSaverView: ScreenSaverView {
     }
 
     private func makeRenderer() -> CellRenderer {
-        var fontSize = settings.fontSize
+        var fontSize = config.fontSize ?? settings.fontSize
         // The thumbnail in System Settings shows the same grid at a small size.
         if isPreview, let screen = window?.screen ?? NSScreen.main, screen.frame.width > 0 {
             fontSize *= bounds.width / screen.frame.width
@@ -228,7 +233,7 @@ final class TtfxSaverView: ScreenSaverView {
     override var hasConfigureSheet: Bool { true }
 
     override var configureSheet: NSWindow? {
-        let sheet = OptionsSheet(settings: Settings.load()) { [weak self] in
+        let sheet = OptionsSheet(settings: Settings.load(), config: ConfigFile.load()) { [weak self] in
             self?.applySettings()
         }
         optionsSheet = sheet

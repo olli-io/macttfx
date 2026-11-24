@@ -5,6 +5,7 @@ final class OptionsSheet: NSObject {
     let window: NSWindow
 
     private var settings: Settings
+    private let config: ConfigFile
     private let onSave: () -> Void
     private var effectBoxes: [NSButton] = []
     private let fontPopup = NSPopUpButton()
@@ -13,8 +14,9 @@ final class OptionsSheet: NSObject {
     private let holdPopup = NSPopUpButton()
 
     /// `onSave` runs after the settings are saved.
-    init(settings: Settings, onSave: @escaping () -> Void) {
+    init(settings: Settings, config: ConfigFile = ConfigFile(), onSave: @escaping () -> Void) {
         self.settings = settings
+        self.config = config
         self.onSave = onSave
         window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 560, height: 480), styleMask: [.titled],
@@ -114,6 +116,11 @@ final class OptionsSheet: NSObject {
         fontPopup.selectItem(withTitle: settings.fontName)
 
         fill(sizePopup, Settings.fontSizes, selected: settings.fontSize) { "\(Int($0)) pt" }
+        if config.fontSize != nil {
+            // The config file overrides this setting.
+            sizePopup.isEnabled = false
+            sizePopup.toolTip = "The file ~/.config/macttfx/config sets the font size."
+        }
         fill(ratePopup, Settings.frameRates.map(Double.init), selected: Double(settings.frameRate)) {
             "\(Int($0)) frames per second"
         }

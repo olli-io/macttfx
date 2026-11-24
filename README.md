@@ -202,7 +202,20 @@ bin/build-saver --preview    # build, then run the view in a window
 
 Select **ttfx** in System Settings → Screen Saver. Its options set the
 effects in the random selection, the font, the font size, the speed and the time
-between effects. To show a different text, change `text.txt` and build again.
+between effects.
+
+The optional file `~/.config/macttfx/config` sets the font size and the text.
+A value in the file overrides the options and the text in the bundle.
+
+```sh
+# Font size in points, from 4 to 200.
+font_size = 24
+# Absolute path, ~/ path, or path relative to the config file.
+text_file = ~/.config/macttfx/text.txt
+```
+
+The screensaver reads the file when it starts. If there is no `text_file`, or
+it cannot be read, the screensaver shows `text.txt` from the bundle.
 
 The bundle has an ad-hoc signature, thus it is for the Mac that built it.
 

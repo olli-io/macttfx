@@ -6,6 +6,7 @@ struct Settings {
     static let moduleName = "org.ttfx.screensaver"
 
     static let fontSizes: [Double] = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48]
+    static let fontSizeRange = 4.0...200.0
     static let frameRates: [Int] = [15, 24, 30, 60, 90, 120]
     static let holdTimes: [Double] = [0, 1, 2, 3, 5, 10, 30]
 
@@ -53,7 +54,7 @@ struct Settings {
             settings.fontName = name
         }
         let fontSize = defaults.double(forKey: Key.fontSize)
-        if fontSize >= 4 && fontSize <= 200 {
+        if fontSizeRange.contains(fontSize) {
             settings.fontSize = fontSize
         }
         let frameRate = defaults.integer(forKey: Key.frameRate)
