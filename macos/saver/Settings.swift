@@ -6,7 +6,7 @@ struct Settings {
     static let moduleName = "org.ttfx.screensaver"
 
     static let fontSizes: [Double] = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48]
-    static let frameRates: [Int] = [15, 24, 30, 60]
+    static let frameRates: [Int] = [15, 24, 30, 60, 90, 120]
     static let holdTimes: [Double] = [0, 1, 2, 3, 5, 10, 30]
 
     /// The effects that are enabled by default.
@@ -24,8 +24,10 @@ struct Settings {
     }
 
     var fontName = "Menlo"
-    var fontSize: Double = 16
-    var frameRate = 60
+    var fontSize: Double = 32
+    /// Effect steps in one second. The CLI default is 60; the effects look
+    /// slow at that rate on a full screen.
+    var frameRate = 120
     /// Seconds to show the last frame of an effect.
     var holdTime: Double = 3
 

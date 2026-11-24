@@ -47,11 +47,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         view.startAnimation()
 
         if let frames = argument(after: "--frames").flatMap({ Int($0) }) {
+            view.fixedStep = true
             benchmark(frames: frames)
             NSApp.terminate(nil)
             return
         }
         if let count = argument(after: "--cycle").flatMap({ Int($0) }) {
+            view.fixedStep = true
             printCycle(count: count)
             NSApp.terminate(nil)
             return

@@ -24,6 +24,17 @@ final class TtfxSaverView: ScreenSaverView {
     private var renderer: CellRenderer?
     private var session: EffectSession?
     private var phase = Phase.running
+    /// The fastest rate at which the host is asked to call
+    /// `animateOneFrame`. A higher speed makes more steps in one call.
+    private static let maxDrawRate = 60.0
+    /// The limit of steps in one call, so that a slow host does not get
+    /// more load from the steps.
+    private static let maxStepsPerCall = 4.0
+    /// If true, each call of `animateOneFrame` makes one step. For the
+    /// benchmark of the development app.
+    var fixedStep = false
+    private var lastStepTime: CFTimeInterval?
+    private var stepDebt = 0.0
     private let text = TtfxSaverView.loadText()
     private var optionsSheet: OptionsSheet?
     private var stopObserver: NSObjectProtocol?
@@ -51,7 +62,7 @@ final class TtfxSaverView: ScreenSaverView {
     /// Reads the settings again and starts a new effect.
     func applySettings() {
         settings = Settings.load()
-        animationTimeInterval = 1 / Double(settings.frameRate)
+        animationTimeInterval = 1 / min(Double(settings.frameRate), Self.maxDrawRate)
         renderer = nil
         nextEffect()
     }
@@ -101,14 +112,18 @@ final class TtfxSaverView: ScreenSaverView {
                 nextEffect()
                 return
             }
-            switch session.step() {
-            case 1:
-                needsDisplay = true
-            case 0:
-                completedEffects += 1
-                phase = .holding(until: Date().addingTimeInterval(settings.holdTime))
-            default:
-                nextEffect(advance: true)
+            for _ in 0..<dueSteps() {
+                switch session.step() {
+                case 1:
+                    needsDisplay = true
+                    continue
+                case 0:
+                    completedEffects += 1
+                    phase = .holding(until: Date().addingTimeInterval(settings.holdTime))
+                default:
+                    nextEffect(advance: true)
+                }
+                break
             }
         case .holding(let until):
             if Date() >= until {
@@ -117,11 +132,31 @@ final class TtfxSaverView: ScreenSaverView {
         }
     }
 
+    /// The number of effect steps for this call. The speed setting is the
+    /// number of steps in one second. The host does not always call
+    /// `animateOneFrame` at that rate (a slow draw, or a display
+    /// that refreshes at a lower rate). The steps follow the clock, thus the
+    /// speed of the effect stays the same.
+    private func dueSteps() -> Int {
+        if fixedStep {
+            return 1
+        }
+        let now = CACurrentMediaTime()
+        defer { lastStepTime = now }
+        guard let lastStepTime else { return 1 }
+        stepDebt = min(stepDebt + (now - lastStepTime) * Double(settings.frameRate), Self.maxStepsPerCall)
+        let steps = Int(stepDebt)
+        stepDebt -= Double(steps)
+        return steps
+    }
+
     /// Starts an effect: a random enabled effect that is not the current one
     /// if `advance` is true, else the current effect again (for a new
     /// layout). If an effect cannot start, a different one is tried.
     private func nextEffect(advance: Bool = false) {
         session = nil
+        lastStepTime = nil
+        stepDebt = 0
         needsDisplay = true
         guard bounds.width > 0, bounds.height > 0 else { return }
         let renderer = self.renderer ?? makeRenderer()
